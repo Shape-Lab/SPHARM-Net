@@ -142,13 +142,13 @@ def read_annotation(fname):
                 temp = np.fromfile(f, dtype=np.dtype(">i1"), count=temp_len)
                 # orig_tab = ''.join([chr(item) for item in temp[:-1]])
                 # print("Original colortable file : ", orig_tab)
-                sturcture_ls = []
+                structure_ls = []
                 structureID_ls = []
                 for _ in range(numEntries):
                     temp_len = np.fromfile(f, dtype=np.dtype(">i4"), count=1)[0]
                     temp = np.fromfile(f, dtype=np.dtype(">i1"), count=temp_len)
                     struct_name = "".join([chr(item) for item in temp[:-1]])
-                    sturcture_ls.append(struct_name)
+                    structure_ls.append(struct_name)
                     row = np.fromfile(f, dtype=np.dtype(">i4"), count=4)
                     structureID = row[0] + row[1] * 2 ** 8 + row[2] * 2 ** 16
                     structureID_ls.append(structureID)
@@ -165,7 +165,7 @@ def read_annotation(fname):
                 # print("Original colortable file : ", orig_tab)
                 numEntriesToRead = np.fromfile(f, dtype=np.dtype(">i4"), count=1)[0]
 
-                sturcture_ls = []
+                structure_ls = []
                 structureID_ls = []
                 for _ in range(numEntriesToRead):
                     structure = np.fromfile(f, dtype=np.dtype(">i4"), count=1)[0] + 1
@@ -175,12 +175,12 @@ def read_annotation(fname):
                     temp_len = np.fromfile(f, dtype=np.dtype(">i4"), count=1)[0]
                     temp = np.fromfile(f, dtype=np.dtype(">i1"), count=temp_len)
                     struct_name = "".join([chr(item) for item in temp[:-1]])
-                    sturcture_ls.append(struct_name)
+                    structure_ls.append(struct_name)
                     row = np.fromfile(f, dtype=np.dtype(">i4"), count=4)
                     structureID = row[0] + row[1] * 2 ** 8 + row[2] * 2 ** 16
                     structureID_ls.append(structureID)
 
-    return vertices, label, sturcture_ls, structureID_ls
+    return vertices, label, structure_ls, structureID_ls
 
 
 def read_vtk(fname):

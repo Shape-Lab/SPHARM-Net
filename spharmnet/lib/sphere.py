@@ -91,7 +91,7 @@ class TriangleSearch:
             q_proj = np.multiply(query.transpose(1, 0), self.r[kk] / np.multiply(query, self.face_normal[kk]).sum(1))
             q_proj = q_proj.transpose(1, 0)
             b = self.barycentric(self.v, self.f[kk], q_proj)
-            valid = (b >= tol).sum(1) == 3
+            valid = np.where((b >= tol).sum(1) == 3)
             which_tri[qID[valid]] = kk[valid]
             bary_list[qID[valid]] = b[valid]
             qID = np.delete(qID, valid)

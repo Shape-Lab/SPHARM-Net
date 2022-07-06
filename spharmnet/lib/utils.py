@@ -37,8 +37,6 @@ class SphericalDataset(Dataset):
             Label: data_dir/labels/{subj}.{lh}.aug0.label.dat.
         partition : str
             Partition = ['train', 'val', 'test']
-        n_splits : int
-            A total of cross-validation folds.
         fold : int
             Cross-validation fold.
         num_vert : int
@@ -67,8 +65,8 @@ class SphericalDataset(Dataset):
 
         feat_dir = os.path.join(data_dir, "features")
         feat_files = os.listdir(feat_dir)
-        feat_files = [f for f in feat_files if ".".join(f.split(".")[3:-1]) in in_ch]
         feat_files = [f for f in feat_files if f.split(".")[1] in hemi]
+        feat_files = [f for ch in in_ch for f in feat_files if ".".join(f.split(".")[3:-1]) in ch]
 
         label_dir = os.path.join(data_dir, "labels")
         label_files = os.listdir(label_dir)
@@ -108,25 +106,22 @@ class SphericalDataset(Dataset):
 
         if partition == "train":
             for subj in train_subj:
-                if subj.split(".")[1] in hemi:
-                    for ag in range(0, aug + 1):
-                        self.feat_list.append(feat_dict[subj]["aug" + str(ag)])
-                        self.label_list.append(label_dict[subj]["aug" + str(ag)])
-                        self.name_list.append(subj)
+                for i in range(0, aug + 1):
+                    self.feat_list.append(feat_dict[subj]["aug" + str(i)])
+                    self.label_list.append(label_dict[subj]["aug" + str(i)])
+                    self.name_list.append(subj)
 
         if partition == "val":
-            if subj.split(".")[1] in hemi:
-                for subj in val_subj:
-                    self.feat_list.append(feat_dict[subj]["aug0"])
-                    self.label_list.append(label_dict[subj]["aug0"])
-                    self.name_list.append(subj)
+            for subj in val_subj:
+                self.feat_list.append(feat_dict[subj]["aug0"])
+                self.label_list.append(label_dict[subj]["aug0"])
+                self.name_list.append(subj)
 
         if partition == "test":
-            if subj.split(".")[1] in hemi:
-                for subj in test_subj:
-                    self.feat_list.append(feat_dict[subj]["aug0"])
-                    self.label_list.append(label_dict[subj]["aug0"])
-                    self.name_list.append(subj)
+            for subj in test_subj:
+                self.feat_list.append(feat_dict[subj]["aug0"])
+                self.label_list.append(label_dict[subj]["aug0"])
+                self.name_list.append(subj)
 
         # label dictionary
         self.lut, _ = squeeze_label(classes)
