@@ -12,7 +12,7 @@ SPHARM-Net seeks (1) a constrained spherical convolutional filter that supports 
 
 ## Package Dependency
 ### Minimum Version
-- Python (3.7)
+- Python (3.6)
 - PyTorch (1.1.0)
 - NumPy (1.11.3)
 - SciPy (1.2.1)

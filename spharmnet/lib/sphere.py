@@ -41,14 +41,39 @@ class TriangleSearch:
         b = self.v[self.f[:, 1], :]
         c = self.v[self.f[:, 2], :]
         normal = np.cross(a - b, a - c)
-        # Exception: when normal == [0, 0, 0]
         zero_normal = (normal == 0).all(axis=1)
         normal[zero_normal] = a[zero_normal]
         normal /= np.linalg.norm(normal, axis=1, keepdims=True)
 
         self.face_normal = normal
+        self.r = (a * self.face_normal).sum(1, keepdims=True)
 
-        self.r = np.multiply(self.v[self.f[:, 0], :], self.face_normal).sum(1)
+        self.ring = 0
+        self.set_ring(3)
+
+    def set_ring(self, ring):
+        """
+        Determine the maximum number of nearest neighbors.
+        """
+
+        if self.ring == 0:
+            self.adj = coo_matrix(
+                (
+                    np.ones(self.f.shape[0] * 3),
+                    (
+                        np.hstack([self.f[:, 0], self.f[:, 1], self.f[:, 2]]),
+                        np.hstack([self.f[:, 1], self.f[:, 2], self.f[:, 0]]),
+                    ),
+                ),
+                shape=(self.v.shape[0], self.v.shape[0]),
+            )
+            self.adj_nn = np.ones(self.v.shape[0])
+
+        if self.ring < ring:
+            for _ in range(self.ring, ring):
+                self.adj_nn = self.adj @ self.adj_nn
+            self.nn = np.max(self.adj_nn).astype(np.int)
+            self.ring = ring
 
     def barycentric(self, v, f, p):
         """
@@ -68,37 +93,38 @@ class TriangleSearch:
 
         return np.hstack([u, v, w])
 
-    def query(self, query_v, tol=-1e-6):
+    def query(self, query, tol=1e-5, ring=3):
         """
-        Find triangle that contains query_v and then compute their barycentric coefficients.
+        Find triangle that contains query and then compute their barycentric coefficients.
         """
 
-        q = query_v / np.linalg.norm(query_v, axis=1, keepdims=True)
+        self.set_ring(ring)
+
+        q = query / np.linalg.norm(query, axis=1, keepdims=True)
 
         q_num = q.shape[0]
         qID = np.arange(q_num)
-        which_tri = np.zeros(q_num, dtype=np.int)
-        bary_list = np.zeros((q_num, 3))
+        fid = np.zeros(q_num, dtype=np.int)
+        bary = np.zeros((q_num, 3), dtype=np.float)
 
-        k = 1
-        while qID.size > 0:
+        for k in range(1, self.nn + 1):
             query = q[qID, :]
-            _, kk = self.MD.query(query, k)
+            _, kk = self.MD.query(query, [k])
+            kk = kk[:, 0]
 
-            if k > 1:
-                kk = kk[:, k - 1]  # k-th closest triangle
-
-            q_proj = np.multiply(query.transpose(1, 0), self.r[kk] / np.multiply(query, self.face_normal[kk]).sum(1))
-            q_proj = q_proj.transpose(1, 0)
+            q_proj = query * (self.r[kk] / (query * self.face_normal[kk]).sum(1, keepdims=True))
             b = self.barycentric(self.v, self.f[kk], q_proj)
-            valid = np.where((b >= tol).sum(1) == 3)
-            which_tri[qID[valid]] = kk[valid]
-            bary_list[qID[valid]] = b[valid]
-            qID = np.delete(qID, valid)
+            valid = (b >= -tol).all(axis=1)
+            fid[qID[valid]] = kk[valid]
+            bary[qID[valid]] = b[valid]
+            qID = qID[~valid]
+            if qID.size == 0:
+                break
 
-            k += 1
+        if qID.size != 0:
+            print(f"No triangle at {qID}. Increase tol or ring size to allow a wider search range.")
 
-        return which_tri, bary_list
+        return fid, bary
 
 
 def vertex_area(v, f):
