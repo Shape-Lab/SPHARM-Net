@@ -78,7 +78,7 @@ class SHT(nn.Module):
         __________
         L : int
             Bandwidth of SHT. This should match L in SpectralConv.
-        Y_inv : int, shape = [n_vertex, (L+1)**2]
+        Y_inv : 2D array, shape = [n_vertex, (L+1)**2]
             Matrix form of harmonic basis.
         area : 1D array
             Area per vertex.
@@ -91,7 +91,7 @@ class SHT(nn.Module):
 
         super().__init__()
 
-        self.Y_inv = Y_inv[:, 0 : (L + 1) ** 2]
+        self.Y_inv = Y_inv[:, : (L + 1) ** 2]
         self.area = area
 
     def forward(self, x):
@@ -109,7 +109,7 @@ class ISHT(nn.Module):
 
         Parameters
         __________
-        Y : int, shape = [(L+1)**2, n_vertex]
+        Y : 2D array, shape = [(L+1)**2, n_vertex]
             Matrix form of harmonic basis.
 
         Notes
@@ -123,6 +123,6 @@ class ISHT(nn.Module):
         self.Y = Y
 
     def forward(self, x):
-        x = torch.matmul(x, self.Y[0 : x.shape[-1], :])
+        x = torch.matmul(x, self.Y[: x.shape[-1], :])
 
         return x

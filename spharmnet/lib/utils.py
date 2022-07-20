@@ -66,7 +66,7 @@ class SphericalDataset(Dataset):
         feat_dir = os.path.join(data_dir, "features")
         feat_files = os.listdir(feat_dir)
         feat_files = [f for f in feat_files if f.split(".")[1] in hemi]
-        feat_files = [f for ch in in_ch for f in feat_files if ".".join(f.split(".")[3:-1]) in ch]
+        feat_files = [f for ch in in_ch for f in feat_files if ".".join(f.split(".")[3:-1]) == ch]
 
         label_dir = os.path.join(data_dir, "labels")
         label_files = os.listdir(label_dir)

@@ -150,7 +150,7 @@ def read_annotation(fname):
                     struct_name = "".join([chr(item) for item in temp[:-1]])
                     structure_ls.append(struct_name)
                     row = np.fromfile(f, dtype=np.dtype(">i4"), count=4)
-                    structureID = row[0] + row[1] * 2 ** 8 + row[2] * 2 ** 16
+                    structureID = row[0] + row[1] * 2**8 + row[2] * 2**16
                     structureID_ls.append(structureID)
 
             else:
@@ -177,7 +177,7 @@ def read_annotation(fname):
                     struct_name = "".join([chr(item) for item in temp[:-1]])
                     structure_ls.append(struct_name)
                     row = np.fromfile(f, dtype=np.dtype(">i4"), count=4)
-                    structureID = row[0] + row[1] * 2 ** 8 + row[2] * 2 ** 16
+                    structureID = row[0] + row[1] * 2**8 + row[2] * 2**16
                     structureID_ls.append(structureID)
 
     return vertices, label, structure_ls, structureID_ls
