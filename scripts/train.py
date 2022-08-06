@@ -217,10 +217,9 @@ def main(args):
 
     # optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    if not args.no_decay:
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, "max", factor=0.1, patience=1, verbose=True, threshold=1e-4, threshold_mode="abs", min_lr=1e-8
-        )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, "max", factor=0.1, patience=1, verbose=True, threshold=1e-4, threshold_mode="abs", min_lr=1e-8
+    )
 
     # training loss
     assert args.loss in ["ce", "dl"]

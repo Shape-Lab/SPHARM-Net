@@ -26,7 +26,7 @@ import torch
 
 from spharmnet import SPHARM_Net
 from spharmnet.lib.sphere import TriangleSearch
-from spharmnet.lib.io import read_feature, read_mesh, write_property
+from spharmnet.lib.io import read_feature, read_mesh, write_vtk
 from spharmnet.lib.utils import normalize_data, squeeze_label, refine_label
 
 
@@ -150,7 +150,7 @@ def main(args):
     if args.surface is not None:
         out_file = out_prefix + ".label.vtk"
         surf_v, surf_f = read_mesh(os.path.join(args.subj_dir, args.hemi + "." + args.surface))
-        write_property(os.path.join(args.out_dir, out_file), surf_v, surf_f, {"label": parc})
+        write_vtk(os.path.join(args.out_dir, out_file), surf_v, surf_f, {"label": parc})
 
 
 if __name__ == "__main__":

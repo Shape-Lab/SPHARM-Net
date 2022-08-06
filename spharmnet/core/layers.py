@@ -1,8 +1,8 @@
 """
 July 2021
 
-Seungbo Ha, mj0829@unist.ac.kr
 Ilwoo Lyu, ilwoolyu@unist.ac.kr
+Seungbo Ha, mj0829@unist.ac.kr
 
 3D Shape Analysis Lab
 Department of Computer Science and Engineering
@@ -41,14 +41,14 @@ class SHConv(nn.Module):
 
         super().__init__()
 
-        ncpt = math.ceil(L / interval) + 1
+        ncpt = int(math.ceil(L / interval)) + 1
         interval2 = 1 if interval == 1 else L - (ncpt - 2) * interval
 
         self.weight = nn.Parameter(torch.empty(in_channels, out_channels, ncpt, 1))
         self.l0 = nn.Parameter(
-            torch.arange(0, 1, 1 / interval).repeat(1, ncpt - 2).view(ncpt - 2, interval), requires_grad=False
+            torch.arange(0, 1, 1.0 / interval).repeat(1, ncpt - 2).view((ncpt - 2, interval)), requires_grad=False
         )
-        self.l1 = nn.Parameter(torch.arange(0, 1 + 1e-8, 1 / interval2).view(1, interval2 + 1), requires_grad=False)
+        self.l1 = nn.Parameter(torch.arange(0, 1 + 1e-8, 1.0 / interval2).view((1, interval2 + 1)), requires_grad=False)
         self.repeats = nn.Parameter(torch.tensor([(2 * l + 1) for l in range(L + 1)]), requires_grad=False)
 
         stdv = 1.0 / math.sqrt(in_channels * (L + 1))

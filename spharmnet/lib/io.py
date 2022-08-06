@@ -200,35 +200,22 @@ def read_vtk(fname):
         Triangles of the input mesh.
     """
 
-    fid = open(fname, "r")
-    lines = fid.readlines()
-    fid.close()
+    with open(fname, "rb") as fd:
+        lines = iter(l for l in fd)
 
-    v = []
-    f = []
-    b = ([lines.index(i) for i in lines if i.startswith("POINTS")])[0] + 1
-    nVert = int(lines[b - 1].split()[1])
-    while len(v) < nVert * 3:
-        line = lines[b]
-        row = [float(n) for n in line.split()]
-        v += row
-        b += 1
+        nVert = next(d for d in lines if b"POINTS" in d)
+        nVert = int(nVert.split()[1])
+        v = np.fromfile(fd, dtype=float, count=nVert * 3, sep=" ").reshape(nVert, 3)
 
-    b = ([lines.index(i) for i in lines if i.startswith("POLYGONS")])[0] + 1
-    nFaces = int(lines[b - 1].split()[1])
-    for i in range(b, b + nFaces):
-        line = lines[i]
-        row = [int(n) for n in line.split()]
-        row = row[1:]
-        f.append(row)
-
-    v = np.reshape(v, (nVert, 3))
-    f = np.array(f)
+        nFace = next(d for d in lines if b"POLYGONS" in d)
+        nFace = int(nFace.split()[1])
+        f = np.fromfile(fd, dtype=int, count=nFace * 4, sep=" ").reshape(nFace, 4)
+        f = f[:, 1:]
 
     return v, f
 
 
-def write_property(fname, v, f, prop):
+def write_vtk(fname, v, f, prop=None):
     """
     Write vtk file with vertex-wise meta data.
 
@@ -255,13 +242,14 @@ def write_property(fname, v, f, prop):
     fid.write(f"POLYGONS {len_f} {len_f * 4}\n")
     for row in f:
         fid.write(f"3 {row[0]} {row[1]} {row[2]}\n")
-    fid.write(f"POINT_DATA {len_v}\n")
-    fid.write(f"FIELD ScalarData {len(prop)}\n")
-    for key in prop.keys():
-        fid.write(f"{key} 1 {len_v} float\n")
-        val = prop[key]
-        for num in val:
-            fid.write(f"{num}\n")
+    if prop is not None:
+        fid.write(f"POINT_DATA {len_v}\n")
+        fid.write(f"FIELD ScalarData {len(prop)}\n")
+        for key in prop.keys():
+            fid.write(f"{key} 1 {len_v} float\n")
+            val = prop[key]
+            for num in val:
+                fid.write(f"{num}\n")
     fid.close()
 
 

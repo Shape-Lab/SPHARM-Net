@@ -1,8 +1,8 @@
 """
 July 2021
 
-Seungbo Ha, mj0829@unist.ac.kr
 Ilwoo Lyu, ilwoolyu@unist.ac.kr
+Seungbo Ha, mj0829@unist.ac.kr
 
 3D Shape Analysis Lab
 Department of Computer Science and Engineering
@@ -40,13 +40,15 @@ class TriangleSearch:
         a = self.v[self.f[:, 0], :]
         b = self.v[self.f[:, 1], :]
         c = self.v[self.f[:, 2], :]
-        normal = np.cross(a - b, a - c)
+        normal = np.cross(b - a, c - b)
         zero_normal = (normal == 0).all(axis=1)
         normal[zero_normal] = a[zero_normal]
-        normal /= np.linalg.norm(normal, axis=1, keepdims=True)
+        area = np.linalg.norm(normal, axis=1, keepdims=True)
+        normal /= area
 
         self.face_normal = normal
-        self.r = (a * self.face_normal).sum(1, keepdims=True)
+        self.r = (a * self.face_normal).sum(axis=1, keepdims=True)
+        self.area = area
 
         self.ring = 0
         self.set_ring(3)
@@ -75,27 +77,29 @@ class TriangleSearch:
             self.nn = np.max(self.adj_nn).astype(np.int)
             self.ring = ring
 
-    def barycentric(self, v, f, p):
+    def barycentric(self, v, f, q, fid, area, normal):
         """
         Barycentric coefficients of p inside triangles f.
         """
 
-        a = v[f[:, 0], :]
-        b = v[f[:, 1], :]
-        c = v[f[:, 2], :]
+        a = v[f[fid, 0], :]
+        b = v[f[fid, 1], :]
+        c = v[f[fid, 2], :]
 
-        n = np.cross(b - a, c - a)
-        abc = np.linalg.norm(n, axis=1, keepdims=True)
-        n /= abc
-        u = (np.cross(b - p, c - p) * n).sum(-1, keepdims=True) / abc
-        v = (np.cross(c - p, a - p) * n).sum(-1, keepdims=True) / abc
+        abc = area[fid]
+        n = normal[fid]
+        aq = (a - q) / abc
+        bq = (b - q) / abc
+        cq = c - q
+        u = (np.cross(bq, cq) * n).sum(axis=1, keepdims=True)
+        v = (np.cross(cq, aq) * n).sum(axis=1, keepdims=True)
         w = 1 - u - v
 
         return np.hstack([u, v, w])
 
     def query(self, query, tol=1e-5, ring=3):
         """
-        Find triangle that contains query and then compute their barycentric coefficients.
+        Find triangles that contain query points and then compute their barycentric coefficients.
         """
 
         self.set_ring(ring)
@@ -113,7 +117,7 @@ class TriangleSearch:
             kk = kk[:, 0]
 
             q_proj = query * (self.r[kk] / (query * self.face_normal[kk]).sum(1, keepdims=True))
-            b = self.barycentric(self.v, self.f[kk], q_proj)
+            b = self.barycentric(self.v, self.f, q_proj, kk, self.area, self.face_normal)
             valid = (b >= -tol).all(axis=1)
             fid[qID[valid]] = kk[valid]
             bary[qID[valid]] = b[valid]
@@ -210,7 +214,7 @@ def legendre(n, x, tol, tstart):
         v = 9.2 - np.log(tol) / (n * factor[idx])
         w = 1 / np.log(v)
         m1 = 1 + n * factor[idx] * v * w * (1.0058 + w * (3.819 - w * 12.173))
-        m1 = np.minimum(n, np.floor(m1)).astype("int")
+        m1 = np.minimum(n, np.floor(m1)).astype(np.int)
 
         Y[:, idx] = 0
         m1_unique = np.unique(m1)
@@ -229,8 +233,8 @@ def legendre(n, x, tol, tstart):
 
         Y[1:, pole] = 0
         Y[0, pole] = np.power(x[pole], n)
-        Y[1:None] *= rootn[2]
-        Y[1:None:2] *= -1
+        Y[1:] *= rootn[2]
+        Y[1::2] *= -1
 
     return Y
 
