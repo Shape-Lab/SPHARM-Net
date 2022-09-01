@@ -1,8 +1,8 @@
 """
 July 2021
 
-Seungbo Ha, mj0829@unist.ac.kr
 Ilwoo Lyu, ilwoolyu@unist.ac.kr
+Seungbo Ha, mj0829@unist.ac.kr
 
 3D Shape Analysis Lab
 Department of Computer Science and Engineering
@@ -22,6 +22,8 @@ from torch.utils.data import Dataset
 
 from scipy import stats
 from scipy.sparse import coo_matrix, csgraph
+
+from .io import read_dat
 
 
 class SphericalDataset(Dataset):
@@ -133,11 +135,12 @@ class SphericalDataset(Dataset):
         # load files
         data = np.array([])
         for f in self.feat_list[idx]:
-            temp = np.fromfile(f, count=self.num_vert, dtype=np.float64)
+            temp = read_dat(f, self.num_vert)
             data = np.append(data, temp)
 
         data = np.reshape(data, (-1, self.num_vert)).astype(np.float32)
-        label = np.fromfile(self.label_list[idx], count=self.num_vert, dtype=np.int16).astype(int)
+        label = read_dat(self.label_list[idx], self.num_vert)
+        label = np.asarray(label).astype(int)
 
         if self.data_norm:
             data = normalize_data(data)
@@ -204,15 +207,15 @@ class Logger(object):
             f.write(line[:-1] + "\n")
 
 
-def get_dice(predicted, labels, n_class, area=None):
+def eval_dice(input, target, n_class, area=None):
     """
     Dice socre.
 
     Parameters
     __________
-    predicted : torch.tensor, shape = [batch, n_vertex]
-        Model outputs.
-    labels : torch.tensor, shape = [batch, n_vertex]
+    input : torch.tensor, shape = [batch, n_vertex]
+        Model inference.
+    target : torch.tensor, shape = [batch, n_vertex]
         True labels.
     n_class : int
         # of classes.
@@ -227,28 +230,28 @@ def get_dice(predicted, labels, n_class, area=None):
 
     if area is None:
         area = 1
-    num_batch = predicted.shape[0]
+    num_batch = input.shape[0]
     batch_numer = torch.zeros(num_batch, n_class)
     batch_denom = torch.zeros(num_batch, n_class)
 
     for i in range(n_class):
-        batch_numer[:, i] = torch.mul(area, ((predicted == i) & (labels == i)).int()).sum(dim=1)
-        batch_denom[:, i] = torch.mul(area, (labels == i).int()).sum(dim=1) + torch.mul(
-            area, (predicted == i).int()
+        batch_numer[:, i] = torch.mul(area, ((input == i) & (target == i)).int()).sum(dim=1)
+        batch_denom[:, i] = torch.mul(area, (target == i).int()).sum(dim=1) + torch.mul(
+            area, (input == i).int()
         ).sum(dim=1)
 
     return 2 * batch_numer / batch_denom
 
 
-def get_accuracy(predicted, labels):
+def eval_accuracy(input, target):
     """
     Accuracy.
 
     Parameters
     __________
-    predicted : torch.tensor, shape = [batch, n_vertex]
-        Model outputs.
-    labels : torch.tensor, shape = [batch, n_vertex]
+    input : torch.tensor, shape = [batch, n_vertex]
+        Model inference.
+    target : torch.tensor, shape = [batch, n_vertex]
         True labels.
 
     Returns
@@ -259,56 +262,20 @@ def get_accuracy(predicted, labels):
         # of vertices.
     """
 
-    n_correct = (predicted == labels).sum().item()
-    n_vert = len(labels.flatten(0))
+    n_correct = (input == target).sum().item()
+    n_vert = len(target.flatten(0))
 
     return n_correct, n_vert
 
 
-def dice_loss(output, target, eps=0, weights=None, ignore_index=None):
-    """
-    Dice loss.
-
-    Notes
-    _____
-    https://discuss.pytorch.org/t/one-hot-encoding-with-autograd-dice-loss/9781/5
-    """
-
-    output = F.softmax(output, 1)
-    encoded_target = output.detach() * 0
-    if ignore_index is not None:
-        mask = target == ignore_index
-        target = target.clone()
-        target[mask] = 0
-        encoded_target.scatter_(1, target.unsqueeze(1), 1)
-        mask = mask.unsqueeze(1).expand_as(encoded_target)
-        encoded_target[mask] = 0
-    else:
-        encoded_target.scatter_(1, target.unsqueeze(1), 1)
-
-    if weights is None:
-        weights = 1
-
-    intersection = output * encoded_target
-    numerator = 2 * intersection.sum(0).sum(1)
-    denominator = output + encoded_target
-
-    if ignore_index is not None:
-        denominator[mask] = 0
-    denominator = denominator.sum(0).sum(1) + eps
-    loss_per_channel = weights * (1 - (numerator / denominator))
-
-    return loss_per_channel.sum() / output.size(1)
-
-
-def squeeze_label(labels):
+def squeeze_label(data):
     """
     Label mapping to squeeze. Input labels are not necessarily continuous,
     which can consume more space without squeeze.
 
     Parameters
     __________
-    labels : 1D int array
+    data : 1D int array
         Input labels.
 
     Returns
@@ -321,7 +288,7 @@ def squeeze_label(labels):
 
     lut_old2new = defaultdict(lambda: 0)
     lut_new2old = dict()
-    for i, label in enumerate(labels):
+    for i, label in enumerate(data):
         lut_old2new[label] = i
         lut_new2old[i] = label
 
@@ -343,17 +310,17 @@ def normalize_data(data):
         Normalized data.
     """
 
-    data = stats.zscore(data, axis=1)
+    data = stats.zscore(data, axis=-1)
     data[data < -3] = -3 - (1 - np.exp(3 + data[data < -3]))
     data[data > 3] = 3 + (1 - np.exp(3 - data[data > 3]))
-    data /= np.std(data, axis=1)[:, None]
+    data /= np.std(data, axis=-1)[:, None]
     data[data < -3] = -3 - (1 - np.exp(3 + data[data < -3]))
     data[data > 3] = 3 + (1 - np.exp(3 - data[data > 3]))
 
     return data
 
 
-def refine_label(output, f):
+def refine_label(data, f):
     """
     Label refinement.
     This function assumes that each ROI has a single connected component.
@@ -361,23 +328,23 @@ def refine_label(output, f):
 
     Parameters
     __________
-    output : 2D array, shape = [n_label, n_vert]
-        Model output.
+    data : 2D array, shape = [n_label, n_vert]
+        Model inference.
     f : 2D array, shape = [n_face, 3]
         Triangles of the input mesh.
 
     Returns
     _______
-    output : 2D array, shape = [n_label, n_vert]
-        Refined model output.
+    data : 2D array, shape = [n_label, n_vert]
+        Refined model inference.
     """
 
-    n_label, n_vert = output.shape
+    n_label, n_vert = data.shape
     v1_ = np.hstack((f[:, 0], f[:, 1], f[:, 2]))
     v2_ = np.hstack((f[:, 1], f[:, 2], f[:, 0]))
     n_comp = 0
-    label = np.argmax(output, 0)
-    label_old = np.zeros(output.shape[-1])
+    label = np.argmax(data, 0)
+    label_old = np.zeros(data.shape[-1])
 
     while n_comp != n_label and (label_old != label).any():
         label_old = label
@@ -394,8 +361,8 @@ def refine_label(output, f):
 
         for i in range(n_label, n_comp):
             idx = comp == comp_ordered[i]
-            output[label[idx], idx] = np.finfo(output.dtype).min
+            data[label[idx], idx] = np.finfo(data.dtype).min
 
-        label = np.argmax(output, 0)
+        label = np.argmax(data, 0)
 
-    return output
+    return data

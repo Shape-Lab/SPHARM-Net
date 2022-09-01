@@ -30,7 +30,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from spharmnet import SPHARM_Net
-from spharmnet.lib.utils import SphericalDataset, Logger, dice_loss, get_accuracy, get_dice
+from spharmnet.lib.utils import SphericalDataset, Logger, eval_accuracy, eval_dice
+from spharmnet.lib.loss import DiceLoss
 from spharmnet.lib.io import read_mesh
 
 
@@ -53,7 +54,7 @@ def get_args():
     parser.add_argument("--epochs", type=int, default=20, help="Max epoch")
     parser.add_argument("--batch-size", type=int, default=1, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=0.01, help="Initial learning rate")
-    parser.add_argument("--no-decay", action="store_true", help="Decay every 2 epochs if no progress")
+    parser.add_argument("--no-decay", action="store_true", help="Disable decay (every 2 epochs if no progress)")
     parser.add_argument("--loss", type=str, default="dl", choices=["dl", "ce"], help="dl: Dice loss, ce: cross entropy")
     parser.add_argument("--log-dir", type=str, default="./logs", help="Path to the log files (output)")
     parser.add_argument("--ckpt-dir", type=str, default="./logs", help="Path to the checkpoint file (output)")
@@ -84,21 +85,21 @@ def train(model, train_loader, device, optimizer, criterion, epoch, logger, ncla
     total_dice = torch.empty((0, nclass))
 
     iter = 0
-    for inputs, labels, _ in tqdm(train_loader):
-        inputs = inputs.to(device)
-        labels = labels.to(device)
+    for input, label, _ in tqdm(train_loader):
+        input = input.to(device)
+        label = label.to(device)
 
         optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
-        running_loss += loss.item()
-        _, predicted = torch.max(outputs, 1)
+        output = model(input)
+        loss = criterion(output, label)
+        running_loss += loss
+        _, output = torch.max(output, 1)
 
-        correct, num_vertex = get_accuracy(predicted, labels)
+        correct, num_vertex = eval_accuracy(output, label)
         total_correct += correct
         total_vertex += num_vertex
 
-        batch_dice = get_dice(predicted, labels, nclass)  # batch_dice : [batch, nclass]
+        batch_dice = eval_dice(output, label, nclass)  # batch_dice : [batch, nclass]
         total_dice = torch.cat([total_dice, batch_dice], dim=0)
 
         iter += 1
@@ -108,7 +109,7 @@ def train(model, train_loader, device, optimizer, criterion, epoch, logger, ncla
 
     accuracy = total_correct / total_vertex
 
-    logger.write([epoch + 1, running_loss / iter, accuracy, torch.mean(total_dice).item()])
+    logger.write([epoch + 1, running_loss.item() / iter, accuracy, torch.mean(total_dice).item()])
 
 
 def test(model, test_loader, device, criterion, epoch, logger, nclass):
@@ -121,27 +122,27 @@ def test(model, test_loader, device, criterion, epoch, logger, nclass):
 
     iter = 0
     with torch.no_grad():
-        for inputs, labels, _ in test_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+        for input, label, _ in test_loader:
+            input = input.to(device)
+            label = label.to(device)
 
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            running_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
+            output = model(input)
+            loss = criterion(output, label)
+            running_loss += loss
+            _, output = torch.max(output, 1)
 
-            correct, num_vertex = get_accuracy(predicted, labels)
+            correct, num_vertex = eval_accuracy(output, label)
             total_correct += correct
             total_vertex += num_vertex
 
-            batch_dice = get_dice(predicted, labels, nclass)  # batch_dice : [batch, nclass]
+            batch_dice = eval_dice(output, label, nclass)  # batch_dice : [batch, nclass]
             total_dice = torch.cat([total_dice, batch_dice], dim=0)
 
             iter += 1
 
     accuracy = total_correct / total_vertex
 
-    logger.write([epoch + 1, running_loss / iter, accuracy, torch.mean(total_dice).item()])
+    logger.write([epoch + 1, running_loss.item() / iter, accuracy, torch.mean(total_dice).item()])
 
     return accuracy
 
@@ -226,7 +227,7 @@ def main(args):
     if args.loss == "ce":
         criterion = nn.CrossEntropyLoss()
     elif args.loss == "dl":
-        criterion = dice_loss
+        criterion = DiceLoss()
 
     # resume if past training is available
     if args.resume:

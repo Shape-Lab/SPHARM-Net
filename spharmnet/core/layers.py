@@ -15,7 +15,7 @@ import torch.nn as nn
 
 
 class SHConv(nn.Module):
-    def __init__(self, in_channels, out_channels, L, interval):
+    def __init__(self, in_ch, out_ch, L, interval):
         """
         The spectral convolutional filter has L+1 coefficients.
         Among the L+1 points, we set anchor points for every interval of "interval".
@@ -23,9 +23,9 @@ class SHConv(nn.Module):
 
         Parameters
         __________
-        in_channels : int
+        in_ch : int
             # of input channels in this layer.
-        out_channels : int
+        out_ch : int
             # of output channels in this layer.
         L : int
             Bandwidth of input channels. An individual harmonic coefficient is learned in this bandwidth.
@@ -35,8 +35,8 @@ class SHConv(nn.Module):
 
         Notes
         _____
-        Input shape  : [batch, in_channels, (L+1)**2]
-        Output shape : [batch, out_channels, (L+1)**2]
+        Input shape  : [batch, in_ch, (L+1)**2]
+        Output shape : [batch, out_ch, (L+1)**2]
         """
 
         super().__init__()
@@ -44,14 +44,14 @@ class SHConv(nn.Module):
         ncpt = int(math.ceil(L / interval)) + 1
         interval2 = 1 if interval == 1 else L - (ncpt - 2) * interval
 
-        self.weight = nn.Parameter(torch.empty(in_channels, out_channels, ncpt, 1))
+        self.weight = nn.Parameter(torch.empty(in_ch, out_ch, ncpt, 1))
         self.l0 = nn.Parameter(
             torch.arange(0, 1, 1.0 / interval).repeat(1, ncpt - 2).view((ncpt - 2, interval)), requires_grad=False
         )
         self.l1 = nn.Parameter(torch.arange(0, 1 + 1e-8, 1.0 / interval2).view((1, interval2 + 1)), requires_grad=False)
         self.repeats = nn.Parameter(torch.tensor([(2 * l + 1) for l in range(L + 1)]), requires_grad=False)
 
-        stdv = 1.0 / math.sqrt(in_channels * (L + 1))
+        stdv = 1.0 / math.sqrt(in_ch * (L + 1))
         self.weight.data.uniform_(-stdv, stdv)
 
     def forward(self, x):

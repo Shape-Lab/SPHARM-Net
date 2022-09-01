@@ -48,7 +48,7 @@ conda install pytorch==1.1.0 cudatoolkit=10.0 -c pytorch
 ```
 To install the required packages, run:
 ```
-pip install -e .
+pip install .
 ```
 
 Two public parcellation datasets were used in this work (thank the authors for sharing their datasets!):
@@ -157,9 +157,9 @@ Saving checkpoint...
 ## Step 3. Inference
 FreeSurfer's `surf` folder is an input to the inference in SPHARM-Net. In this step, we use the saved model `./logs/best_model_fold$fold.pth` in Step 2. To label an unseen subject, run the following command line:
 ```
-python ./scripts/parc.py --subj_dir $SUBJECTS_DIR/subj_1/surf --hemi lh
+python ./scripts/parc.py --subj_dir $SUBJECTS_DIR/subj_1 --hemi lh
 ```
-By default, the vertex-wise inference is written in `./output/subj_1.lh.label.txt` (label per vertex per line) using `lh.sphere` in the above example. Like Step 1, use `--native-sphere` to specify the registered sphere (e.g., `sphere.reg`) as needed. Also, use `--surface` to overlay the inference onto a mesh file. For example, adding `--surface white` to the above command line will generate `./output/subj_1.lh.label.vtk` that overlays `./output/subj_1.lh.label.txt` onto `$SUBJECTS_DIR/subj_1/surf/lh.white` (gray/white surface). You can then display it with visualization tools such as [ParaView](https://www.paraview.org/).
+By default, the vertex-wise inference is written in `./output/subj_1.lh.label.txt` (label per vertex per line) using `lh.sphere` in the above example. Like Step 1, use `--native-sphere` to specify the registered sphere (e.g., `sphere.reg`) as needed (this is of course not a requirement). Also, use `--surface` to overlay the inference onto a mesh file. For example, adding `--surface white` to the above command line will generate `./output/subj_1.lh.label.vtk` that overlays `./output/subj_1.lh.label.txt` onto `$SUBJECTS_DIR/subj_1/surf/lh.white` (gray/white surface). You can then display it with visualization tools such as [ParaView](https://www.paraview.org/).
 
 Since the proposed convolution learns harmonic coefficients, any spherical tessellation can be used for inference. In general, a reference sphere is not mandatory for inference, unlike spatial spherical convolution approaches. A re-tessellation approach can introduce sampling artifacts (jagged boundaries) while achieving fast inference with high memory efficiency. The figure below shows a slight difference along the parcellation boundaries with (left) and without (right) spherical re-tessellation (click to zoom-in the figure).
 

@@ -25,7 +25,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from spharmnet.lib.sphere import TriangleSearch
-from spharmnet.lib.io import read_feature, read_mesh, read_annotation
+from spharmnet.lib.io import read_feat, read_mesh, read_annot
 
 
 def get_args():
@@ -37,6 +37,9 @@ def get_args():
         help="Reference sphere mesh for re-tessellation (vtk or FreeSurfer format)",
     )
     parser.add_argument("--data-dir", type=str, help="Path to FreeSurfer home (default: $SUBJECTS_DIR)")
+    parser.add_argument("--feat-dir", type=str, default="surf", help="Path to geometry for parcellation")
+    parser.add_argument("--label-dir", type=str, default="label", help="Path to target labels")
+    parser.add_argument("--native-sphere-dir", type=str, default="surf", help="Path to native sphere")
     parser.add_argument("--out-dir", type=str, default="./dataset", help="Path to re-tessellated data (output)")
     parser.add_argument("--native-sphere", type=str, default="sphere", help="Native sphere mesh (sphere, sphere.reg, etc.)")
     parser.add_argument("--hemi", type=str, nargs="+", choices=["lh", "rh"], help="Hemisphere for data generation", required=True)
@@ -48,25 +51,26 @@ def get_args():
     return args
 
 
-def gen_data(data_dir, out_dir, subj_name, hemi, native_sphere, in_ch, ico_v, annot_file):
+def gen_data(data_dir, out_dir, feat_dir, label_dir, native_sphere_dir, subj_name, hemi, native_sphere, in_ch, ico_v, annot_file):
     print("Processing {}...".format(subj_name))
 
-    surf_dir = os.path.join(os.path.join(data_dir, subj_name), "surf")
-    label_dir = os.path.join(os.path.join(data_dir, subj_name), "label")
+    feat_dir = os.path.join(data_dir, subj_name, feat_dir)
+    native_sphere_dir = os.path.join(data_dir, subj_name, native_sphere_dir)
+    label_dir = os.path.join(data_dir, subj_name, label_dir)
 
     feat_out_dir = os.path.join(out_dir, "features")
     label_out_dir = os.path.join(out_dir, "labels")
     csv_out_dir = os.path.join(out_dir, "label_csv")
 
     for this_hemi in hemi:
-        native_v, native_f = read_mesh(os.path.join(surf_dir, this_hemi + "." + native_sphere))
-        native_mesh = TriangleSearch(native_v, native_f)
-        triangle_idx, bary_coeff = native_mesh.query(ico_v)
+        native_v, native_f = read_mesh(os.path.join(native_sphere_dir, this_hemi + "." + native_sphere))
+        tree = TriangleSearch(native_v, native_f)
+        triangle_idx, bary_coeff = tree.query(ico_v)
 
         # Generating features
         for feat_name in in_ch:
-            feat_path = os.path.join(surf_dir, this_hemi + "." + feat_name)
-            feat, _ = read_feature(feat_path)
+            feat_path = os.path.join(feat_dir, this_hemi + "." + feat_name)
+            feat = read_feat(feat_path)
             feat_remesh = np.multiply(feat[native_f[triangle_idx]], bary_coeff).sum(-1)
 
             with open(
@@ -79,9 +83,8 @@ def gen_data(data_dir, out_dir, subj_name, hemi, native_sphere, in_ch, ico_v, an
         label_arr = np.zeros(num_vert, dtype=np.int16)
 
         annot = os.path.join(label_dir, this_hemi + "." + annot_file + ".annot")
-        vertices, label, sturcture_ls, structureID_ls = read_annotation(annot)
+        vertices, label, sturcture_ls, structureID_ls = read_annot(annot)
 
-        # If 'label' contains unidenfied label, map those elements to 0
         label = [structureID_ls.index(l) if l in structureID_ls else 0 for l in label]
         label_arr[vertices] = label
 
@@ -120,6 +123,9 @@ def main(args):
         delayed(gen_data)(
             data_dir=data_dir,
             out_dir=args.out_dir,
+            feat_dir=args.feat_dir,
+            label_dir=args.label_dir,
+            native_sphere_dir=args.native_sphere_dir,
             subj_name=subj_name,
             hemi=args.hemi,
             native_sphere=args.native_sphere,

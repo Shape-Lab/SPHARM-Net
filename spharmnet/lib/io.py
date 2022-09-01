@@ -13,7 +13,7 @@ import numpy as np
 import os
 
 
-def read_feature(fname):
+def read_curv(fname, nvert=-1):
     """
     Read FreeSurfer's geometry.
 
@@ -21,6 +21,8 @@ def read_feature(fname):
     __________
     fname : str
         File path.
+    nvert : int
+        # of verts to be read
 
     Returns
     _______
@@ -42,11 +44,11 @@ def read_feature(fname):
 
         if vnum == 0xFFFFFF:
             vnum, fnum, vals_per_vertex = np.fromfile(f, dtype=np.dtype(">i4"), count=3)
-            feat = np.fromfile(f, dtype=np.dtype(">f4"), count=vnum)
+            feat = np.fromfile(f, dtype=np.dtype(">f4"), count=nvert)
         else:
             f0, f1, f2 = np.fromfile(f, dtype=np.dtype("B"), count=3)
             fnum = (f0 << 16) + (f1 << 8) + f2
-            feat = np.fromfile(f, dtype=np.dtype(">i2"), count=vnum) / 100
+            feat = np.fromfile(f, dtype=np.dtype(">i2"), count=nvert) / 100
 
     return feat, fnum
 
@@ -109,7 +111,52 @@ def read_surf(fname):
             raise Exception("SurfReaderError: unknown format!")
 
 
-def read_annotation(fname):
+def read_dat(fname, nvert=-1):
+    """
+    Read SPHARM-Net's geometry.
+
+    Parameters
+    __________
+    fname : str
+        File path.
+    nvert : int
+        # of verts to be read
+
+    Returns
+    _______
+    feat : 1D array
+        Vertex-wise geometry.
+    """
+
+    attr = fname.lower().split(".")
+    attr = attr[-2]
+
+    dtype = np.int16 if attr == "label" else np.float64
+
+    return np.fromfile(fname, dtype=dtype, count=nvert)
+
+
+def read_txt(fname, nvert=-1):
+    """
+    Read geometry.
+
+    Parameters
+    __________
+    fname : str
+        File path.
+    nvert : int
+        # of verts to be read
+
+    Returns
+    _______
+    feat : 1D array
+        Vertex-wise geometry.
+    """
+
+    return np.fromfile(fname, dtype=np.float64, sep=" ", count=nvert)
+
+
+def read_annot(fname):
     """
     Read FreeSurfer's annot.
 
@@ -181,6 +228,36 @@ def read_annotation(fname):
                     structureID_ls.append(structureID)
 
     return vertices, label, structure_ls, structureID_ls
+
+
+def read_feat(fname, nvert=-1):
+    """
+    Read a geometry file.
+    Parameters
+    __________
+    fname : str
+        File path.
+    nvert : int
+        # of verts to be read
+
+    Returns
+    _______
+    v : 2D array, shape = [n_vertex, 3]
+        3D coordinates of the the input mesh.
+    f : 2D array, shape = [n_face, 3]
+        Triangles of the input mesh.
+    """
+
+    _, ext = os.path.splitext(fname.lower())
+
+    if ext == ".txt":
+        feat = read_txt(fname, nvert)
+    elif ext == ".dat":
+        feat = read_dat(fname, nvert)
+    else:
+        feat, _ = read_curv(fname, nvert)
+
+    return feat
 
 
 def read_vtk(fname):

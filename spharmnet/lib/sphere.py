@@ -18,7 +18,7 @@ from scipy.sparse import coo_matrix
 class TriangleSearch:
     def __init__(self, v, f):
         """
-        Fast closest triangle search. This module is particularly useful for spherical tessellation.
+        Fast closest triangle search.
         The module only works on spherical tessellation.
 
         Parameters
@@ -79,7 +79,7 @@ class TriangleSearch:
 
     def barycentric(self, v, f, q, fid, area, normal):
         """
-        Barycentric coefficients of p inside triangles f.
+        Barycentric coefficients of q inside triangles f.
         """
 
         a = v[f[fid, 0], :]
@@ -101,6 +101,9 @@ class TriangleSearch:
         """
         Find triangles that contain query points and then compute their barycentric coefficients.
         """
+
+        dim = np.shape(query)
+        query = query.reshape(-1, 3)
 
         self.set_ring(ring)
 
@@ -127,6 +130,9 @@ class TriangleSearch:
 
         if qID.size != 0:
             print(f"No triangle at {qID}. Increase tol or ring size to allow a wider search range.")
+
+        fid = fid.reshape(dim[:-1])
+        bary = bary.reshape(dim)
 
         return fid, bary
 
