@@ -28,7 +28,7 @@ class SHConvBlock(nn.Module):
 
         [1] Ha, Seungbo, and Ilwoo Lyu.
             "SPHARM-Net: Spherical Harmonics-based Convolution for Cortical Parcellation."
-            IEEE Transactions on Medical Imaging (2022).
+            IEEE Transactions on Medical Imaging 41, no. 10 (2022): 2739-2751.
 
         Parameters
         __________
@@ -85,12 +85,12 @@ class SPHARM_Net(nn.Module):
 
         [1] Ha, Seungbo, and Ilwoo Lyu.
             "SPHARM-Net: Spherical Harmonics-based Convolution for Cortical Parcellation."
-            IEEE Transactions on Medical Imaging (2022).
+            IEEE Transactions on Medical Imaging 41, no. 10 (2022): 2739-2751.
 
         Parameters
         __________
         sphere : str
-            Sphere mesh file. VTK (ASCII) < v4.0 or FreeSurfer format.
+            Sphere mesh file. VTK (ASCII) or FreeSurfer format.
         device : torch.device
             Device indicator.
         in_ch : int

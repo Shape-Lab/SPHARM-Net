@@ -5,7 +5,7 @@ If you use this code, please cite the following paper.
 
     Seungbo Ha and Ilwoo Lyu
     SPHARM-Net: Spherical Harmonics-based Convolution for Cortical Parcellation.
-    IEEE Transactions on Medical Imaging. 2022
+    IEEE Transactions on Medical Imaging, 41(10), 2739-2751, 2022
 
 Copyright 2022 Ilwoo Lyu
 

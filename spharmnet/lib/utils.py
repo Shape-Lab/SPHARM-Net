@@ -27,7 +27,7 @@ from .io import read_dat
 
 
 class SphericalDataset(Dataset):
-    def __init__(self, data_dir, partition, fold, num_vert, classes, in_ch, seed, aug, n_splits, hemi, data_norm=True):
+    def __init__(self, data_dir, partition, fold, num_vert, classes, in_ch, seed, aug, n_splits, hemi, data_norm=True, preload=None):
         """
         Loader for SPHARM-Net. This module subdivides the input dataset for cross-validation.
 
@@ -47,7 +47,7 @@ class SphericalDataset(Dataset):
         classes : 1D int array
             List of labels. Their numbers are not necessarily continuous.
         in_ch : 1D str array
-            input geometric features.
+            Input geometric features.
         seed : int
             Seed for data shuffling. This shuffling is deterministic.
         aug : int
@@ -58,12 +58,15 @@ class SphericalDataset(Dataset):
             Hemisphere = ['lh', 'rh']. Both hemispheres can be trained together.
         data_norm : bool, optional
             Z-score+prctile data normalization.
+        preload : str, optional
+            Data preloading on a specified device.
         """
 
         assert partition in ["train", "test", "val"]
         self.num_vert = num_vert
         self.partition = partition
         self.data_norm = data_norm
+        self.preload = preload is not None
 
         feat_dir = os.path.join(data_dir, "features")
         feat_files = os.listdir(feat_dir)
@@ -128,10 +131,26 @@ class SphericalDataset(Dataset):
         # label dictionary
         self.lut, _ = squeeze_label(classes)
 
+        if self.preload:
+            self.data = []
+            self.label = []
+            for i in range(len(self.feat_list)):
+                data, label, _ = self.read_data(i)
+                data = torch.tensor(data, device=preload)
+                label = torch.tensor(label, device=preload)
+                self.data += [data]
+                self.label += [label]
+
     def __len__(self):
         return len(self.feat_list)
 
     def __getitem__(self, idx):
+        if self.preload:
+            return self.data[idx], self.label[idx], self.name_list[idx]
+        else:
+            return self.read_data(idx)
+
+    def read_data(self, idx):
         # load files
         data = np.array([])
         for f in self.feat_list[idx]:
@@ -140,7 +159,7 @@ class SphericalDataset(Dataset):
 
         data = np.reshape(data, (-1, self.num_vert)).astype(np.float32)
         label = read_dat(self.label_list[idx], self.num_vert)
-        label = np.asarray(label).astype(int)
+        label = label.astype(int)
 
         if self.data_norm:
             data = normalize_data(data)

@@ -5,7 +5,7 @@ If you use this code, please cite the following paper.
 
     Seungbo Ha and Ilwoo Lyu
     SPHARM-Net: Spherical Harmonics-based Convolution for Cortical Parcellation.
-    IEEE Transactions on Medical Imaging. 2022
+    IEEE Transactions on Medical Imaging, 41(10), 2739-2751, 2022
 
 Copyright 2022 Ilwoo Lyu
 
@@ -23,6 +23,7 @@ import os
 import argparse
 import numpy as np
 from tqdm import tqdm
+from contextlib import ExitStack
 
 import torch
 import torch.nn as nn
@@ -42,6 +43,7 @@ def get_args():
     parser.add_argument("--sphere", type=str, default="./sphere/ico6.vtk", help="Sphere mesh (vtk or FreeSurfer format)")
     parser.add_argument("--data-dir", type=str, default="./dataset", help="Path to re-tessellated data")
     parser.add_argument("--data-norm", action="store_true", help="Z-score+prctile data normalization")
+    parser.add_argument("--preload", type=str, choices=["none", "cpu", "device"], default="device", help="Data preloading")
     parser.add_argument("--in-ch", type=str, default=["curv", "sulc", "inflated.H"], nargs="+", help="List of geometry")
     parser.add_argument("--hemi", type=str, nargs="+", choices=["lh", "rh"], help="Hemisphere for learning", required=True)
     parser.add_argument("--n-splits", type=int, default=5, required=False, help="A total of cross-validation folds")
@@ -76,8 +78,13 @@ def get_args():
     return args
 
 
-def train(model, train_loader, device, optimizer, criterion, epoch, logger, nclass):
-    model.train()
+def step(model, train_loader, device, criterion, epoch, logger, nclass, optimizer=None, pbar=False):
+    if optimizer is not None:
+        model.train()
+    else:
+        model.eval()
+    progress = tqdm if pbar else lambda x: x
+
     running_loss = 0.0
     total_correct = 0  # for calculating accuracy
     total_vertex = 0  # for calculating accuracy
@@ -85,47 +92,13 @@ def train(model, train_loader, device, optimizer, criterion, epoch, logger, ncla
     total_dice = torch.empty((0, nclass))
 
     iter = 0
-    for input, label, _ in tqdm(train_loader):
-        input = input.to(device)
-        label = label.to(device)
-
-        optimizer.zero_grad()
-        output = model(input)
-        loss = criterion(output, label)
-        running_loss += loss
-        _, output = torch.max(output, 1)
-
-        correct, num_vertex = eval_accuracy(output, label)
-        total_correct += correct
-        total_vertex += num_vertex
-
-        batch_dice = eval_dice(output, label, nclass)  # batch_dice : [batch, nclass]
-        total_dice = torch.cat([total_dice, batch_dice], dim=0)
-
-        iter += 1
-
-        loss.backward()
-        optimizer.step()
-
-    accuracy = total_correct / total_vertex
-
-    logger.write([epoch + 1, running_loss.item() / iter, accuracy, torch.mean(total_dice).item()])
-
-
-def test(model, test_loader, device, criterion, epoch, logger, nclass):
-    model.eval()
-    running_loss = 0.0
-    total_correct = 0  # for calculating accuracy
-    total_vertex = 0.0  # for calculating accuracy
-
-    total_dice = torch.empty((0, nclass))
-
-    iter = 0
-    with torch.no_grad():
-        for input, label, _ in test_loader:
+    with torch.no_grad() if optimizer is None else ExitStack():
+        for input, label, _ in progress(train_loader):
             input = input.to(device)
             label = label.to(device)
 
+            if optimizer is not None:
+                optimizer.zero_grad()
             output = model(input)
             loss = criterion(output, label)
             running_loss += loss
@@ -140,6 +113,10 @@ def test(model, test_loader, device, criterion, epoch, logger, nclass):
 
             iter += 1
 
+            if optimizer is not None:
+                loss.backward()
+                optimizer.step()
+
     accuracy = total_correct / total_vertex
 
     logger.write([epoch + 1, running_loss.item() / iter, accuracy, torch.mean(total_dice).item()])
@@ -150,6 +127,8 @@ def test(model, test_loader, device, criterion, epoch, logger, nclass):
 def main(args):
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device(f"cuda:{args.gpu}" if args.cuda else "cpu")
+    preload = None if args.preload == "none" else device if args.preload == "device" else args.preload
+
     if not args.cuda:
         torch.set_num_threads(args.threads)
 
@@ -177,6 +156,7 @@ def main(args):
             n_splits=args.n_splits,
             hemi=args.hemi,
             data_norm=args.data_norm,
+            preload=preload,
         )
 
     # dataset loader
@@ -252,8 +232,8 @@ def main(args):
     # main loop
     best_acc = 0
     for epoch in range(start_epoch, args.epochs):
-        train(model, loader["train"], device, optimizer, criterion, epoch, logger["train"], len(args.classes))
-        val_acc = test(model, loader["val"], device, criterion, epoch, logger["val"], len(args.classes))
+        step(model, loader["train"], device, criterion, epoch, logger["train"], len(args.classes), optimizer, True)
+        val_acc = step(model, loader["val"], device, criterion, epoch, logger["val"], len(args.classes))
 
         if not args.no_decay:
             scheduler.step(val_acc)
@@ -277,7 +257,7 @@ def main(args):
     test_ckpt = torch.load(os.path.join(args.ckpt_dir, "best_model_fold{}.pth".format(args.fold)))
     model.load_state_dict(test_ckpt["model_state_dict"])
     model.to(device)
-    test(model, loader["test"], device, criterion, test_ckpt["epoch"], logger["test"], len(args.classes))
+    step(model, loader["test"], device, criterion, test_ckpt["epoch"], logger["test"], len(args.classes))
 
 
 if __name__ == "__main__":

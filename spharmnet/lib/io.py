@@ -243,7 +243,7 @@ def read_feat(fname, nvert=-1):
     Returns
     _______
     v : 2D array, shape = [n_vertex, 3]
-        3D coordinates of the the input mesh.
+        3D coordinates of the input mesh.
     f : 2D array, shape = [n_face, 3]
         Triangles of the input mesh.
     """
@@ -262,7 +262,7 @@ def read_feat(fname, nvert=-1):
 
 def read_vtk(fname):
     """
-    Read a vtk file (ASCII version and VTK < v4.0).
+    Read a vtk file (ASCII version).
 
     Parameters
     __________
@@ -280,14 +280,22 @@ def read_vtk(fname):
     with open(fname, "rb") as fd:
         lines = iter(l for l in fd)
 
+        ver = next(d for d in lines if b"Version" in d)
+        ver = float(ver.split()[-1])
+
         nVert = next(d for d in lines if b"POINTS" in d)
         nVert = int(nVert.split()[1])
         v = np.fromfile(fd, dtype=float, count=nVert * 3, sep=" ").reshape(nVert, 3)
 
         nFace = next(d for d in lines if b"POLYGONS" in d)
         nFace = int(nFace.split()[1])
-        f = np.fromfile(fd, dtype=int, count=nFace * 4, sep=" ").reshape(nFace, 4)
-        f = f[:, 1:]
+        if ver < 5:
+            f = np.fromfile(fd, dtype=int, count=nFace * 4, sep=" ").reshape(nFace, 4)
+            f = f[:, 1:]
+        else:
+            nFace -= 1
+            next(d for d in lines if b"CONNECTIVITY" in d)
+            f = np.fromfile(fd, dtype=int, count=nFace * 3, sep=" ").reshape(nFace, 3)
 
     return v, f
 
