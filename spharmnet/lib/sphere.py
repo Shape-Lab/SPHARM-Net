@@ -220,7 +220,7 @@ def legendre(n, x, tol, tstart):
         v = 9.2 - np.log(tol) / (n * factor[idx])
         w = 1 / np.log(v)
         m1 = 1 + n * factor[idx] * v * w * (1.0058 + w * (3.819 - w * 12.173))
-        m1 = np.minimum(n, np.floor(m1)).astype(np.int)
+        m1 = np.minimum(n, np.floor(m1)).astype(np.int64)
 
         Y[:, idx] = 0
         m1_unique = np.unique(m1)
