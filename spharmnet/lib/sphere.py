@@ -74,7 +74,7 @@ class TriangleSearch:
         if self.ring < ring:
             for _ in range(self.ring, ring):
                 self.adj_nn = self.adj @ self.adj_nn
-            self.nn = np.max(self.adj_nn).astype(np.int)
+            self.nn = np.max(self.adj_nn).astype(np.int64)
             self.ring = ring
 
     def barycentric(self, v, f, q, fid, area, normal):
@@ -111,7 +111,7 @@ class TriangleSearch:
 
         q_num = q.shape[0]
         qID = np.arange(q_num)
-        fid = np.zeros(q_num, dtype=np.int)
+        fid = np.zeros(q_num, dtype=np.int64)
         bary = np.zeros((q_num, 3), dtype=np.float)
 
         for k in range(1, self.nn + 1):
