@@ -38,7 +38,7 @@ Depending on the NVIDIA GPU architectures, the package version numbers vary. For
 ```
 conda create --name spharm-net python=3.7
 conda activate spharm-net
-conda install pytorch==1.8.0 cudatoolkit=11.1 -c pytorch -c conda-forge
+pip install torch==1.8.0+cu111 --extra-index-url https://download.pytorch.org/whl/cu111
 ```
 For the Turing or earlier architectures, run:
 ```
